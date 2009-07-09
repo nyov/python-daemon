@@ -13,12 +13,10 @@
     """
 
 import os
-import sys
 import errno
-import time
 
 from lockfile import (
-    LockBase, LinkFileLock,
+    LinkFileLock,
     AlreadyLocked, LockFailed,
     NotLocked, NotMyLock,
     )
