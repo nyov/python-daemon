@@ -91,7 +91,17 @@ def read_pid_from_pidfile(pidfile_path):
     except IOError:
         pass
     else:
-        line = pidfile.read().strip()
+        # According to the FHS 2.3 section on PID files in ‘/var/run’:
+        # 
+        #   The file must consist of the process identifier in
+        #   ASCII-encoded decimal, followed by a newline character. …
+        # 
+        #   Programs that read PID files should be somewhat flexible
+        #   in what they accept; i.e., they should ignore extra
+        #   whitespace, leading zeroes, absence of the trailing
+        #   newline, or additional lines in the PID file.
+
+        line = pidfile.readline().strip()
         try:
             pid = int(line)
         except ValueError:
@@ -108,11 +118,22 @@ def write_pid_to_pidfile(pidfile_path):
         and write it to the named file as a line of text.
 
         """
-    pidfile = open(pidfile_path, 'w')
+    open_flags = (os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    open_mode = 0x644
+    pidfile_fd = os.open(pidfile_path, open_flags, open_mode)
+    pidfile = os.fdopen(pidfile_fd, 'w')
+
+    # According to the FHS 2.3 section on PID files in ‘/var/run’:
+    #
+    #   The file must consist of the process identifier in
+    #   ASCII-encoded decimal, followed by a newline character. For
+    #   example, if crond was process number 25, /var/run/crond.pid
+    #   would contain three characters: two, five, and newline.
 
     pid = os.getpid()
     line = "%(pid)d\n" % vars()
     pidfile.write(line)
+    pidfile.close()
 
 
 def remove_existing_pidfile(pidfile_path):
