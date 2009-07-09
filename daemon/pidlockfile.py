@@ -71,10 +71,11 @@ class PIDLockFile(LinkFileLock, object):
     def break_lock(self):
         """ Break an existing lock.
 
-            Removes the PID file if it already exists, otherwise does
-            nothing.
+            If the lock is held, breaks the lock and removes the PID
+            file.
 
             """
+        super(PIDLockFile, self).break_lock()
         remove_existing_pidfile(self.path)
 
 
