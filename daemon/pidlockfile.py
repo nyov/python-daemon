@@ -18,18 +18,21 @@ import errno
 import time
 
 from lockfile import (
-    LockBase,
+    LockBase, LinkFileLock,
     AlreadyLocked, LockFailed,
     NotLocked, NotMyLock,
     )
 
 
-class PIDLockFile(LockBase):
+class PIDLockFile(LinkFileLock):
     """ Lockfile implemented as a Unix PID file.
 
-        The lock file is a normal file named by the attribute `path`.
-        A lock's PID file contains a single line of text, containing
-        the process ID (PID) of the process that acquired the lock.
+        The PID file is named by the attribute `path`. When locked,
+        the file will be created with a single line of text,
+        containing the process ID (PID) of the process that acquired
+        the lock.
+
+        The lock is acquired and maintained as per `LinkFileLock`.
 
         """
 
@@ -37,29 +40,6 @@ class PIDLockFile(LockBase):
         """ Get the PID from the lock file.
             """
         result = read_pid_from_pidfile(self.path)
-        return result
-
-    def is_locked(self):
-        """ Test if the lock is currently held.
-
-            The lock is held if the PID file for this lock exists.
-
-            """
-        result = pidfile_exists(self.path)
-        return result
-
-    def i_am_locking(self):
-        """ Test if the lock is held by the current process.
-
-            Returns ``True`` if the current process ID matches the
-            number stored in the PID file.
-
-            """
-        result = False
-        current_pid = os.getpid()
-        pidfile_pid = self.read_pid()
-        if current_pid == pidfile_pid:
-            result = True
         return result
 
     poll_interval = 0.1
