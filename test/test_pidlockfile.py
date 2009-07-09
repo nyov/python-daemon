@@ -39,23 +39,39 @@ def setup_pidlockfile_fixtures(testcase):
     testcase.test_instance = pidlockfile.PIDLockFile(
         **testcase.pidlockfile_args)
 
-    def mock_os_path_exists(path):
-        if path == testcase.mock_pidfile_path:
-            result = testcase.pidfile_path_exists_func()
-        else:
-            result = False
-        return result
-
-    scaffold.mock(
-        "os.path.exists",
-        returns_func=mock_os_path_exists,
-        tracker=testcase.mock_tracker)
+    testcase.test_instance._mock_lock_pid = None
+    def mock_acquire_lock(timeout=None):
+        if testcase.test_instance._mock_lock_pid:
+            raise lockfile.AlreadyLocked()
+        testcase.test_instance._mock_lock_pid = testcase.mock_current_pid
+    def mock_release_lock():
+        if not testcase.test_instance._mock_lock_pid:
+            raise lockfile.NotLocked()
+        elif (
+            testcase.test_instance._mock_lock_pid != testcase.mock_current_pid):
+            raise lockfile.NotMyLock()
+        testcase.test_instance._mock_lock_pid = None
+    def mock_is_locked():
+        return bool(testcase.test_instance._mock_lock_pid)
+    def mock_i_am_locking():
+        return (
+            testcase.test_instance._mock_lock_pid == testcase.mock_current_pid)
 
     scaffold.mock(
         "lockfile.LinkFileLock.acquire",
+        returns_func=mock_acquire_lock,
         tracker=testcase.mock_tracker)
     scaffold.mock(
         "lockfile.LinkFileLock.release",
+        returns_func=mock_release_lock,
+        tracker=testcase.mock_tracker)
+    scaffold.mock(
+        "lockfile.LinkFileLock.is_locked",
+        returns_func=mock_is_locked,
+        tracker=testcase.mock_tracker)
+    scaffold.mock(
+        "lockfile.LinkFileLock.i_am_locking",
+        returns_func=mock_i_am_locking,
         tracker=testcase.mock_tracker)
 
     scaffold.mock(
@@ -159,43 +175,66 @@ class PIDLockFile_release_TestCase(scaffold.TestCase):
     def setUp(self):
         """ Set up test fixtures. """
         setup_pidlockfile_fixtures(self)
+        self.mock_tracker.clear()
+
         self.mock_pidfile = self.mock_pidfile_current
-        self.pidfile_path_exists_func = (lambda: True)
-        self.pidfile_open_func = self.mock_pidfile_open_exist
+        self.test_instance._mock_lock_pid = self.mock_current_pid
 
     def tearDown(self):
         """ Tear down test fixtures. """
         scaffold.mock_restore()
 
-    def test_raises_not_locked_if_no_pid_file(self):
-        """ Should raise NotLocked error if PID file does not exist. """
+    def test_remove_existing_pidfile_not_called_if_not_locking(self):
+        """ Should not request removal of PID file if not locking. """
         instance = self.test_instance
-        self.pidfile_path_exists_func = (lambda: False)
+        self.test_instance._mock_lock_pid = None
         expect_error = lockfile.NotLocked
-        self.failUnlessRaises(
-            expect_error,
-            instance.release)
+        unwanted_mock_output = (
+            "..."
+            "Called pidlockfile.remove_existing_pidfile"
+            "...")
+        try:
+            instance.release()
+        except expect_error:
+            pass
+        self.failIfMockCheckerMatch(unwanted_mock_output)
 
-    def test_raises_not_my_lock_if_pid_file_not_locked_by_this_lock(self):
-        """ Should raise NotMyLock error if PID file not locked by me. """
+    def test_remove_existing_pidfile_not_called_if_not_my_lock(self):
+        """ Should not request removal of PID file if we are not locking. """
         instance = self.test_instance
-        self.mock_pidfile = self.mock_pidfile_other
+        self.test_instance._mock_lock_pid = self.mock_other_pid
         expect_error = lockfile.NotMyLock
-        self.failUnlessRaises(
-            expect_error,
-            instance.release)
+        unwanted_mock_output = (
+            "..."
+            "Called pidlockfile.remove_existing_pidfile"
+            "...")
+        try:
+            instance.release()
+        except expect_error:
+            pass
+        self.failIfMockCheckerMatch(unwanted_mock_output)
 
-    def test_removes_existing_pidfile(self):
-        """ Should request removal of specified PID file. """
+    def test_removes_existing_pidfile_if_i_am_locking(self):
+        """ Should request removal of specified PID file if lock is ours. """
         instance = self.test_instance
         self.mock_pidfile = self.mock_pidfile_current
         pidfile_path = self.mock_pidfile_path
         expect_mock_output = """\
             ...
             Called pidlockfile.remove_existing_pidfile(%(pidfile_path)r)
+            ...
             """ % vars()
         instance.release()
-        scaffold.mock_restore()
+        self.failUnlessMockCheckerMatch(expect_mock_output)
+
+    def test_calls_linkfilelock_release(self):
+        """ Should finally call LinkFileLock.release method. """
+        instance = self.test_instance
+        expect_mock_output = """\
+            ...
+            Called lockfile.LinkFileLock.release()
+            """
+        instance.release()
         self.failUnlessMockCheckerMatch(expect_mock_output)
 
 

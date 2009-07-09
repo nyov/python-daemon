@@ -24,7 +24,7 @@ from lockfile import (
     )
 
 
-class PIDLockFile(LinkFileLock):
+class PIDLockFile(LinkFileLock, object):
     """ Lockfile implemented as a Unix PID file.
 
         The PID file is named by the attribute `path`. When locked,
@@ -81,17 +81,13 @@ class PIDLockFile(LinkFileLock):
     def release(self):
         """ Release the lock.
 
-            Removes the PID file to release the lock, or raises an
+            Removes the PID file then releases the lock, or raises an
             error if the current process does not hold the lock.
 
             """
-        if not self.is_locked():
-            error = NotLocked()
-            raise error
-        if not self.i_am_locking():
-            error = NotMyLock()
-            raise error
-        remove_existing_pidfile(self.path)
+        if self.i_am_locking():
+            remove_existing_pidfile(self.path)
+        super(PIDLockFile, self).release()
 
     def break_lock(self):
         """ Break an existing lock.
