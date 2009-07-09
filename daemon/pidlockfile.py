@@ -42,36 +42,15 @@ class PIDLockFile(LinkFileLock, object):
         result = read_pid_from_pidfile(self.path)
         return result
 
-    poll_interval = 0.1
-
-    def acquire(self, timeout=None):
+    def acquire(self, *args, **kwargs):
         """ Acquire the lock.
 
-            Creates the PID file for this lock, then returns None.
-
-            If the lock is already held, behaviour depends on the
-            `timeout` parameter:
-
-            * `timeout` is ``None``: poll every 0.1 seconds, waiting
-              for the lock indefinitely.
-
-            * `timeout` > 0: poll every 0.1 seconds, waiting for the
-              lock. After `timeout` seconds elapse without acquiring
-              the lock, raise an `AlreadyLocked` error.
-
-            * `timeout` <= 0: immediately raise an `AlreadyLocked`
-              error.
+            Locks the PID file then creates the PID file for this
+            lock. The `timeout` parameter is used as for the
+            `LinkFileLock` class.
 
             """
-        if timeout is not None:
-            request_timestamp = time.time()
-            timeout_timestamp = request_timestamp + timeout
-        while pidfile_exists(self.path):
-            if timeout is not None:
-                if time.time() > timeout_timestamp:
-                    error = AlreadyLocked()
-                    raise error
-            time.sleep(self.poll_interval)
+        super(PIDLockFile, self).acquire(*args, **kwargs)
         try:
             write_pid_to_pidfile(self.path)
         except OSError:

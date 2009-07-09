@@ -138,12 +138,34 @@ class PIDLockFile_acquire_TestCase(scaffold.TestCase):
     def setUp(self):
         """ Set up test fixtures. """
         setup_pidlockfile_fixtures(self)
-        self.pidfile_path_exists_func = (lambda: False)
-        self.pidfile_open_func = self.mock_pidfile_open_nonexist
+        self.mock_tracker.clear()
+
+        self.mock_pidfile = self.mock_pidfile_current
 
     def tearDown(self):
         """ Tear down test fixtures. """
         scaffold.mock_restore()
+
+    def test_calls_linkfilelock_acquire(self):
+        """ Should first call LinkFileLock.acquire method. """
+        instance = self.test_instance
+        expect_mock_output = """\
+            Called lockfile.LinkFileLock.acquire()
+            ...
+            """
+        instance.acquire()
+        self.failUnlessMockCheckerMatch(expect_mock_output)
+
+    def test_calls_linkfilelock_acquire_with_timeout(self):
+        """ Should first call LinkFileLock.acquire method. """
+        instance = self.test_instance
+        test_timeout = object()
+        expect_mock_output = """\
+            Called lockfile.LinkFileLock.acquire(timeout=%(test_timeout)r)
+            ...
+            """ % vars()
+        instance.acquire(timeout=test_timeout)
+        self.failUnlessMockCheckerMatch(expect_mock_output)
 
     def test_writes_pid_to_specified_file(self):
         """ Should request writing current PID to specified file. """
@@ -245,7 +267,6 @@ class PIDLockFile_break_lock_TestCase(scaffold.TestCase):
         """ Set up test fixtures. """
         setup_pidlockfile_fixtures(self)
         self.mock_pidfile = self.mock_pidfile_other
-        self.pidfile_path_exists_func = (lambda: True)
         self.pidfile_open_func = self.mock_pidfile_open_exist
 
     def tearDown(self):
@@ -255,7 +276,6 @@ class PIDLockFile_break_lock_TestCase(scaffold.TestCase):
     def test_returns_none_if_no_pid_file(self):
         """ Should return None if PID file does not exist. """
         instance = self.test_instance
-        self.pidfile_path_exists_func = (lambda: False)
         expect_result = None
         result = instance.break_lock()
         self.failUnlessEqual(expect_result, result)
@@ -303,19 +323,6 @@ def setup_pidfile_fixtures(testcase):
         "os.getpid",
         returns=testcase.mock_current_pid,
         tracker=testcase.mock_tracker)
-
-    def mock_path_exists(path):
-        if path == testcase.mock_pidfile_path:
-            result = testcase.pidfile_exists_func(path)
-        else:
-            result = False
-        return result
-
-    testcase.pidfile_exists_func = (lambda p: False)
-
-    scaffold.mock(
-        "os.path.exists",
-        mock_obj=mock_path_exists)
 
     def mock_pidfile_open_nonexist(filename, mode, buffering):
         if 'r' in mode:
