@@ -35,6 +35,44 @@ from daemon import pidlockfile
 from daemon import runner
 
 
+def setup_lockfile_method_mocks(testcase, class_name):
+    """ Set up common mock methods for lockfile class. """
+
+    def mock_is_locked():
+        return testcase.scenario['exists']
+    def mock_i_am_locking():
+        return (
+            testcase.scenario['exists'] and
+            testcase.scenario['locking_pid'] == testcase.scenario['pid'])
+    def mock_read_pid():
+        return testcase.scenario['read_pid']
+    def mock_acquire(timeout=None):
+        if testcase.scenario['exists']:
+            raise lockfile.AlreadyLocked()
+        testcase.scenario['locking_pid'] = testcase.scenario['pid']
+        testcase.scenario['exists'] = True
+    def mock_release():
+        if not testcase.scenario['exists']:
+            raise lockfile.NotLocked()
+        if testcase.scenario['locking_pid'] != testcase.scenario['pid']:
+            raise lockfile.NotMyLock()
+        testcase.scenario['locking_pid'] = None
+        testcase.scenario['exists'] = False
+    def mock_break_lock():
+        testcase.scenario['locking_pid'] = None
+        testcase.scenario['exists'] = False
+
+    for func_name in [
+        'is_locked', 'i_am_locking', 'read_pid',
+        'acquire', 'release', 'break_lock',
+        ]:
+        mock_func = vars()["mock_%(func_name)s" % vars()]
+        lockfile_func_name = "%(class_name)s.%(func_name)s" % vars()
+        scaffold.mock(
+            lockfile_func_name,
+            returns_func=mock_func,
+            tracker=testcase.mock_tracker)
+
 def setup_runner_fixtures(testcase):
     """ Set up common test fixtures for DaemonRunner test case. """
     testcase.mock_tracker = scaffold.MockTracker()
@@ -49,15 +87,23 @@ def setup_runner_fixtures(testcase):
         mock_obj=testcase.mock_stderr,
         tracker=testcase.mock_tracker)
 
-    testcase.mock_pidlockfile = scaffold.Mock(
-        "pidlockfile.PIDLockFile",
-        tracker=testcase.mock_tracker)
-    testcase.mock_pidlockfile.path = testcase.scenario['path']
+    testcase.lockfile_class_name = "pidlockfile.PIDLockFile"
+    for scenario in testcase.pidlockfile_scenarios.values():
+        scenario['lockfile'] = scaffold.Mock(
+            testcase.lockfile_class_name,
+            tracker=testcase.mock_tracker)
+        scenario['lockfile'].path = scenario['path']
 
+    lockfiles_by_path = dict(
+        (scenario['lockfile'].path, scenario['lockfile'])
+        for scenario in testcase.pidlockfile_scenarios.values())
     scaffold.mock(
-        "pidlockfile.PIDLockFile",
-        returns=testcase.mock_pidlockfile,
+        testcase.lockfile_class_name,
+        returns_func=(lambda path: lockfiles_by_path[path]),
         tracker=testcase.mock_tracker)
+    testcase.mock_pidlockfile = testcase.scenario['lockfile']
+
+    setup_lockfile_method_mocks(testcase, testcase.lockfile_class_name)
 
     class TestApp(object):
 
@@ -182,14 +228,14 @@ class DaemonRunner_TestCase(scaffold.TestCase):
  
     def test_has_created_pidfile(self):
         """ Should have new PID lock file as `pidfile` attribute. """
-        expect_pidfile = self.mock_pidlockfile
+        expect_pidfile = self.scenario['lockfile']
         instance = self.test_instance
         self.failUnlessIs(
             expect_pidfile, instance.pidfile)
  
     def test_daemon_context_has_created_pidfile(self):
         """ DaemonContext component should have new PID lock file. """
-        expect_pidfile = self.mock_pidlockfile
+        expect_pidfile = self.scenario['lockfile']
         daemon_context = self.test_instance.daemon_context
         self.failUnlessIs(
             expect_pidfile, daemon_context.pidfile)
@@ -377,9 +423,6 @@ class DaemonRunner_do_action_start_TestCase(scaffold.TestCase):
         self.test_instance.action = 'start'
 
         self.scenario = self.pidlockfile_scenarios['nonexist']
-        self.mock_pidlockfile.is_locked.mock_returns = False
-        self.mock_pidlockfile.i_am_locking.mock_returns = False
-        self.mock_pidlockfile.read_pid.mock_returns = None
 
     def tearDown(self):
         """ Tear down test fixtures. """

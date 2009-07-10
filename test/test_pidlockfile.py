@@ -116,19 +116,23 @@ def setup_pidfile_fixtures(testcase):
             'exists': False,
             'pidfile_pid': None,
             'locking_pid': None,
+            'read_pid': None,
             },
         'exist-currentpid': {
             'exists': True,
             'pidfile_pid': mock_current_pid,
+            'read_pid': mock_current_pid,
             },
         'exist-otherpid': {
             'exists': True,
             'pidfile_pid': mock_other_pid,
+            'read_pid': mock_other_pid,
             },
         'exist-invalid': {
             'exists': True,
             'pidfile_pid': "b0gUs",
             'locking_pid': None,
+            'read_pid': None,
             },
         }
 
@@ -153,6 +157,47 @@ def setup_pidfile_fixtures(testcase):
     testcase.scenario = testcase.pidlockfile_scenarios['nonexist']
 
 
+def setup_lockfile_method_mocks(testcase, class_name):
+    """ Set up common mock methods for lockfile class. """
+
+    def mock_is_locked():
+        return testcase.scenario['exists']
+    def mock_i_am_locking():
+        return (
+            testcase.scenario['exists'] and
+            testcase.scenario['locking_pid'] == testcase.scenario['pid'])
+    def mock_acquire(timeout=None):
+        if testcase.scenario['exists']:
+            raise lockfile.AlreadyLocked()
+        testcase.scenario['locking_pid'] = testcase.scenario['pid']
+        testcase.scenario['exists'] = True
+    def mock_release():
+        if not testcase.scenario['exists']:
+            raise lockfile.NotLocked()
+        if testcase.scenario['locking_pid'] != testcase.scenario['pid']:
+            raise lockfile.NotMyLock()
+        testcase.scenario['locking_pid'] = None
+        testcase.scenario['exists'] = False
+    def mock_break_lock():
+        testcase.scenario['locking_pid'] = None
+        testcase.scenario['exists'] = False
+
+    for func_name in [
+        'is_locked', 'i_am_locking',
+        'acquire', 'release', 'break_lock',
+        ]:
+        mock_func = vars()["mock_%(func_name)s" % vars()]
+        lockfile_func_name = "%(class_name)s.%(func_name)s" % vars()
+        mock_lockfile_func = scaffold.Mock(
+            lockfile_func_name,
+            returns_func=mock_func,
+            tracker=testcase.mock_tracker)
+        scaffold.mock(
+            lockfile_func_name,
+            mock_obj=mock_lockfile_func,
+            tracker=testcase.mock_tracker)
+
+
 def setup_pidlockfile_fixtures(testcase):
     """ Set up common fixtures for PIDLockFile test cases. """
 
@@ -161,49 +206,12 @@ def setup_pidlockfile_fixtures(testcase):
     testcase.pidlockfile_args = dict(
         path=testcase.scenario['path'],
         )
-
     testcase.test_instance = pidlockfile.PIDLockFile(
         **testcase.pidlockfile_args)
+    for scenario in testcase.pidlockfile_scenarios.values():
+        scenario['lockfile'] = testcase.test_instance
 
-    def mock_is_locked():
-        return bool(testcase.scenario['locking_pid'])
-    def mock_i_am_locking():
-        return (
-            testcase.scenario['locking_pid'] == testcase.scenario['pid'])
-    def mock_acquire_lock(timeout=None):
-        if testcase.scenario['locking_pid']:
-            raise lockfile.AlreadyLocked()
-        testcase.scenario['locking_pid'] = testcase.scenario['pid']
-    def mock_release_lock():
-        if not testcase.scenario['locking_pid']:
-            raise lockfile.NotLocked()
-        elif (
-            testcase.scenario['locking_pid'] != testcase.scenario['pid']):
-            raise lockfile.NotMyLock()
-        testcase.scenario['locking_pid'] = None
-    def mock_break_lock():
-        testcase.scenario['locking_pid'] = None
-
-    scaffold.mock(
-        "lockfile.LinkFileLock.is_locked",
-        returns_func=mock_is_locked,
-        tracker=testcase.mock_tracker)
-    scaffold.mock(
-        "lockfile.LinkFileLock.i_am_locking",
-        returns_func=mock_i_am_locking,
-        tracker=testcase.mock_tracker)
-    scaffold.mock(
-        "lockfile.LinkFileLock.acquire",
-        returns_func=mock_acquire_lock,
-        tracker=testcase.mock_tracker)
-    scaffold.mock(
-        "lockfile.LinkFileLock.release",
-        returns_func=mock_release_lock,
-        tracker=testcase.mock_tracker)
-    scaffold.mock(
-        "lockfile.LinkFileLock.break_lock",
-        returns_func=mock_break_lock,
-        tracker=testcase.mock_tracker)
+    setup_lockfile_method_mocks(testcase, "lockfile.LinkFileLock")
 
     scaffold.mock(
         "pidlockfile.write_pid_to_pidfile",
@@ -259,7 +267,7 @@ class PIDLockFile_read_pid_TestCase(scaffold.TestCase):
     def test_gets_pid_via_read_pid_from_pidfile(self):
         """ Should get PID via read_pid_from_pidfile. """
         instance = self.test_instance
-        test_pid = self.scenario['pidfile_pid']
+        test_pid = self.scenario['read_pid']
         expect_pid = test_pid
         result = instance.read_pid()
         self.failUnlessEqual(expect_pid, result)
@@ -341,7 +349,7 @@ class PIDLockFile_release_TestCase(scaffold.TestCase):
     def test_remove_existing_pidfile_not_called_if_not_locking(self):
         """ Should not request removal of PID file if not locking. """
         instance = self.test_instance
-        self.scenario['locking_pid'] = None
+        self.scenario = self.pidlockfile_scenarios['nonexist']
         expect_error = lockfile.NotLocked
         unwanted_mock_output = (
             "..."
@@ -352,7 +360,7 @@ class PIDLockFile_release_TestCase(scaffold.TestCase):
             instance.release)
         self.failIfMockCheckerMatch(unwanted_mock_output)
 
-    def test_remove_existing_pidfile_not_called_if_not_my_lock(self):
+    def test_does_not_remove_existing_pidfile_if_not_my_lock(self):
         """ Should not request removal of PID file if we are not locking. """
         instance = self.test_instance
         self.scenario = self.pidlockfile_scenarios['exist-otherpid']
