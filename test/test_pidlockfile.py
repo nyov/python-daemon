@@ -26,6 +26,113 @@ import scaffold
 from daemon import pidlockfile
 
 
+class FakeFileDescriptorStringIO(StringIO, object):
+    """ A StringIO class that fakes a file descriptor. """
+
+    _fileno_generator = itertools.count()
+
+    def __init__(self, *args, **kwargs):
+        self._fileno = self._fileno_generator.next()
+        super_instance = super(FakeFileDescriptorStringIO, self)
+        super_instance.__init__(*args, **kwargs)
+
+    def fileno(self):
+        return self._fileno
+
+
+def setup_pidfile_fixtures(testcase):
+    """ Set up common fixtures for PID file test cases. """
+    testcase.mock_tracker = scaffold.MockTracker()
+
+    mock_current_pid = 235
+    testcase.mock_other_pid = 8642
+    testcase.mock_pidfile_current = FakeFileDescriptorStringIO(
+        "%(mock_current_pid)d\n" % vars())
+    testcase.mock_pidfile_other = FakeFileDescriptorStringIO(
+        "%(mock_other_pid)d\n" % vars(testcase))
+
+    scaffold.mock(
+        "os.getpid",
+        returns=mock_current_pid,
+        tracker=testcase.mock_tracker)
+
+    def mock_pidfile_open_nonexist(filename, mode, buffering):
+        if 'r' in mode:
+            raise IOError("No such file %(filename)r" % vars())
+        else:
+            result = testcase.mock_pidfile
+        return result
+
+    def mock_pidfile_open_exist(filename, mode, buffering):
+        result = testcase.mock_pidfile
+        return result
+
+    testcase.mock_pidfile_open_nonexist = mock_pidfile_open_nonexist
+    testcase.mock_pidfile_open_exist = mock_pidfile_open_exist
+
+    testcase.pidfile_open_func = NotImplemented
+    testcase.mock_pidfile = NotImplemented
+
+    def mock_open(filename, mode='r', buffering=None):
+        if filename == testcase.scenario['path']:
+            result = testcase.pidfile_open_func(filename, mode, buffering)
+        else:
+            result = FakeFileDescriptorStringIO()
+        return result
+
+    scaffold.mock(
+        "__builtin__.open",
+        returns_func=mock_open,
+        tracker=testcase.mock_tracker)
+
+    def mock_pidfile_os_open_nonexist(filename, flags, mode):
+        if (flags & os.O_CREAT):
+            result = testcase.mock_pidfile.fileno()
+        else:
+            raise OSError(errno.ENOENT, "No such file", filename)
+        return result
+
+    def mock_pidfile_os_open_exist(filename, flags, mode):
+        result = testcase.mock_pidfile.fileno()
+        return result
+
+    testcase.mock_pidfile_os_open_nonexist = mock_pidfile_os_open_nonexist
+    testcase.mock_pidfile_os_open_exist = mock_pidfile_os_open_exist
+
+    testcase.pidfile_os_open_func = NotImplemented
+
+    def mock_os_open(filename, flags, mode=None):
+        if filename == testcase.scenario['path']:
+            result = testcase.pidfile_os_open_func(
+                filename, flags, mode)
+        else:
+            result = FakeFileDescriptorStringIO().fileno()
+        return result
+
+    scaffold.mock(
+        "os.open",
+        returns_func=mock_os_open,
+        tracker=testcase.mock_tracker)
+
+    def mock_os_fdopen(fd, mode='r', buffering=None):
+        if fd == testcase.mock_pidfile.fileno():
+            result = testcase.mock_pidfile
+        else:
+            raise OSError(errno.EBADF, "Bad file descriptor")
+        return result
+
+    scaffold.mock(
+        "os.fdopen",
+        returns_func=mock_os_fdopen,
+        tracker=testcase.mock_tracker)
+
+    testcase.scenario = {
+        'pid': mock_current_pid,
+        'path': tempfile.mktemp(),
+        'locking_pid': None,
+        }
+
+
 def setup_pidlockfile_fixtures(testcase):
     """ Set up common fixtures for PIDLockFile test cases. """
 
@@ -296,113 +403,6 @@ class PIDLockFile_break_lock_TestCase(scaffold.TestCase):
             """ % vars()
         instance.break_lock()
         self.failUnlessMockCheckerMatch(expect_mock_output)
-
-
-class FakeFileDescriptorStringIO(StringIO, object):
-    """ A StringIO class that fakes a file descriptor. """
-
-    _fileno_generator = itertools.count()
-
-    def __init__(self, *args, **kwargs):
-        self._fileno = self._fileno_generator.next()
-        super_instance = super(FakeFileDescriptorStringIO, self)
-        super_instance.__init__(*args, **kwargs)
-
-    def fileno(self):
-        return self._fileno
-
-
-def setup_pidfile_fixtures(testcase):
-    """ Set up common fixtures for PID file test cases. """
-    testcase.mock_tracker = scaffold.MockTracker()
-
-    mock_current_pid = 235
-    testcase.mock_other_pid = 8642
-    testcase.mock_pidfile_current = FakeFileDescriptorStringIO(
-        "%(mock_current_pid)d\n" % vars())
-    testcase.mock_pidfile_other = FakeFileDescriptorStringIO(
-        "%(mock_other_pid)d\n" % vars(testcase))
-
-    testcase.scenario = {
-        'pid': mock_current_pid,
-        'path': tempfile.mktemp(),
-        'locking_pid': None,
-        }
-
-    scaffold.mock(
-        "os.getpid",
-        returns=testcase.scenario['pid'],
-        tracker=testcase.mock_tracker)
-
-    def mock_pidfile_open_nonexist(filename, mode, buffering):
-        if 'r' in mode:
-            raise IOError("No such file %(filename)r" % vars())
-        else:
-            result = testcase.mock_pidfile
-        return result
-
-    def mock_pidfile_open_exist(filename, mode, buffering):
-        result = testcase.mock_pidfile
-        return result
-
-    testcase.mock_pidfile_open_nonexist = mock_pidfile_open_nonexist
-    testcase.mock_pidfile_open_exist = mock_pidfile_open_exist
-
-    testcase.pidfile_open_func = NotImplemented
-    testcase.mock_pidfile = NotImplemented
-
-    def mock_open(filename, mode='r', buffering=None):
-        if filename == testcase.scenario['path']:
-            result = testcase.pidfile_open_func(filename, mode, buffering)
-        else:
-            result = FakeFileDescriptorStringIO()
-        return result
-
-    scaffold.mock(
-        "__builtin__.open",
-        returns_func=mock_open,
-        tracker=testcase.mock_tracker)
-
-    def mock_pidfile_os_open_nonexist(filename, flags, mode):
-        if (flags & os.O_CREAT):
-            result = testcase.mock_pidfile.fileno()
-        else:
-            raise OSError(errno.ENOENT, "No such file", filename)
-        return result
-
-    def mock_pidfile_os_open_exist(filename, flags, mode):
-        result = testcase.mock_pidfile.fileno()
-        return result
-
-    testcase.mock_pidfile_os_open_nonexist = mock_pidfile_os_open_nonexist
-    testcase.mock_pidfile_os_open_exist = mock_pidfile_os_open_exist
-
-    testcase.pidfile_os_open_func = NotImplemented
-
-    def mock_os_open(filename, flags, mode=None):
-        if filename == testcase.scenario['path']:
-            result = testcase.pidfile_os_open_func(
-                filename, flags, mode)
-        else:
-            result = FakeFileDescriptorStringIO().fileno()
-        return result
-
-    scaffold.mock(
-        "os.open",
-        returns_func=mock_os_open,
-        tracker=testcase.mock_tracker)
-
-    def mock_os_fdopen(fd, mode='r', buffering=None):
-        if fd == testcase.mock_pidfile.fileno():
-            result = testcase.mock_pidfile
-        else:
-            raise OSError(errno.EBADF, "Bad file descriptor")
-        return result
-
-    scaffold.mock(
-        "os.fdopen",
-        returns_func=mock_os_fdopen,
-        tracker=testcase.mock_tracker)
 
 
 class read_pid_from_pidfile_TestCase(scaffold.TestCase):
