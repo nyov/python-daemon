@@ -170,16 +170,25 @@ def make_pidlockfile(path):
 
     return lockfile
 
+
 def pidfile_lock_is_stale(pidfile):
-    """ Determine whether a PID file refers to a nonexistent PID. """
+    """ Determine whether a PID file is stale.
+
+        Returns ``True`` (“stale”) if the PID file does not contain
+        the PID of a currently-running process, otherwise ``False``.
+
+        """
     result = False
 
     pidfile_pid = pidfile.read_pid()
-    try:
-        os.kill(pidfile_pid, signal.SIG_DFL)
-    except OSError, exc:
-        if exc.errno == errno.ESRCH:
-            # The specified PID does not exist
-            result = True
+    if not pidfile_pid:
+        result = True
+    else:
+        try:
+            os.kill(pidfile_pid, signal.SIG_DFL)
+        except OSError, exc:
+            if exc.errno == errno.ESRCH:
+                # The specified PID does not exist
+                result = True
 
     return result

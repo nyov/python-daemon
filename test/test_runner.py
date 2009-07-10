@@ -486,6 +486,21 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
         scaffold.mock_restore()
         self.failUnlessIn(exc.message, pidfile_path)
 
+    def test_breaks_lock_if_pidfile_content_not_valid(self):
+        """ Should break lock if PID file content is not valid. """
+        instance = self.test_instance
+        self.mock_pidlockfile.is_locked.mock_returns = True
+        self.mock_pidlockfile.i_am_locking.mock_returns = False
+        self.mock_pidlockfile.read_pid.mock_returns = None
+        expect_mock_output = """\
+            ...
+            Called pidlockfile.PIDLockFile.read_pid()
+            Called pidlockfile.PIDLockFile.break_lock()
+            """ % vars()
+        instance.do_action()
+        scaffold.mock_restore()
+        self.failUnlessMockCheckerMatch(expect_mock_output)
+
     def test_breaks_lock_if_pidfile_lock_stale(self):
         """ Should break lock if PID file lock is stale. """
         instance = self.test_instance
@@ -496,6 +511,7 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
         os.kill.mock_raises = error
         expect_mock_output = """\
             ...
+            Called pidlockfile.PIDLockFile.read_pid()
             Called os.kill(%(test_pid)r, %(expect_signal)r)
             Called pidlockfile.PIDLockFile.break_lock()
             """ % vars()
