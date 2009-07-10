@@ -130,6 +130,7 @@ class DaemonRunner_TestCase(scaffold.TestCase):
             tracker=self.mock_tracker)
 
         self.test_instance = runner.DaemonRunner(self.test_app)
+        self.scenario = self.pidlockfile_scenarios['nonexist']
 
     def tearDown(self):
         """ Tear down test fixtures. """
@@ -247,6 +248,8 @@ class DaemonRunner_usage_exit_TestCase(scaffold.TestCase):
         """ Set up test fixtures. """
         setup_runner_fixtures(self)
 
+        self.scenario = self.pidlockfile_scenarios['nonexist']
+
     def tearDown(self):
         """ Tear down test fixtures. """
         scaffold.mock_restore()
@@ -285,6 +288,8 @@ class DaemonRunner_parse_args_TestCase(scaffold.TestCase):
             "daemon.runner.DaemonRunner._usage_exit",
             raises=NotImplementedError,
             tracker=self.mock_tracker)
+
+        self.scenario = self.pidlockfile_scenarios['nonexist']
 
     def tearDown(self):
         """ Tear down test fixtures. """
@@ -345,6 +350,8 @@ class DaemonRunner_do_action_TestCase(scaffold.TestCase):
         """ Set up test fixtures. """
         setup_runner_fixtures(self)
 
+        self.scenario = self.pidlockfile_scenarios['nonexist']
+
     def tearDown(self):
         """ Tear down test fixtures. """
         scaffold.mock_restore()
@@ -369,6 +376,7 @@ class DaemonRunner_do_action_start_TestCase(scaffold.TestCase):
 
         self.test_instance.action = 'start'
 
+        self.scenario = self.pidlockfile_scenarios['nonexist']
         self.mock_pidlockfile.is_locked.mock_returns = False
         self.mock_pidlockfile.i_am_locking.mock_returns = False
         self.mock_pidlockfile.read_pid.mock_returns = None
@@ -380,9 +388,10 @@ class DaemonRunner_do_action_start_TestCase(scaffold.TestCase):
     def test_aborts_if_pidfile_locked(self):
         """ Should raise SystemExit if PID file is locked. """
         instance = self.test_instance
+        self.scenario = self.pidlockfile_scenarios['exist-otherpid']
         self.mock_pidlockfile.is_locked.mock_returns = True
         self.mock_pidlockfile.i_am_locking.mock_returns = False
-        self.mock_pidlockfile.read_pid.mock_returns = self.mock_other_pid
+        self.mock_pidlockfile.read_pid.mock_returns = self.scenario['pidfile_pid']
         pidfile_path = self.scenario['path']
         expect_error = SystemExit
         try:
@@ -397,11 +406,12 @@ class DaemonRunner_do_action_start_TestCase(scaffold.TestCase):
     def test_breaks_lock_if_no_such_process(self):
         """ Should request breaking lock if PID file process is not running. """
         instance = self.test_instance
+        self.scenario = self.pidlockfile_scenarios['exist-otherpid']
         self.mock_pidlockfile.is_locked.mock_returns = True
         self.mock_pidlockfile.i_am_locking.mock_returns = False
-        self.mock_pidlockfile.read_pid.mock_returns = self.mock_other_pid
+        self.mock_pidlockfile.read_pid.mock_returns = self.scenario['pidfile_pid']
         pidfile_path = self.scenario['path']
-        test_pid = self.mock_other_pid
+        test_pid = self.scenario['pidfile_pid']
         expect_signal = signal.SIG_DFL
         error = OSError(errno.ESRCH, "Not running")
         os.kill.mock_raises = error
@@ -458,9 +468,10 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
 
         self.test_instance.action = 'stop'
 
+        self.scenario = self.pidlockfile_scenarios['exist-otherpid']
         self.mock_pidlockfile.is_locked.mock_returns = True
         self.mock_pidlockfile.i_am_locking.mock_returns = False
-        self.mock_pidlockfile.read_pid.mock_returns = self.mock_other_pid
+        self.mock_pidlockfile.read_pid.mock_returns = self.scenario['pidfile_pid']
 
     def tearDown(self):
         """ Tear down test fixtures. """
@@ -469,6 +480,7 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
     def test_aborts_if_pidfile_not_locked(self):
         """ Should report failure and exit if PID file is not locked. """
         instance = self.test_instance
+        self.scenario = self.pidlockfile_scenarios['nonexist']
         self.mock_pidlockfile.is_locked.mock_returns = False
         self.mock_pidlockfile.i_am_locking.mock_returns = False
         self.mock_pidlockfile.read_pid.mock_returns = None
@@ -487,6 +499,7 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
     def test_breaks_lock_if_pidfile_content_not_valid(self):
         """ Should break lock if PID file content is not valid. """
         instance = self.test_instance
+        self.scenario = self.pidlockfile_scenarios['exist-invalid']
         self.mock_pidlockfile.is_locked.mock_returns = True
         self.mock_pidlockfile.i_am_locking.mock_returns = False
         self.mock_pidlockfile.read_pid.mock_returns = None
@@ -503,7 +516,7 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
         """ Should break lock if PID file lock is stale. """
         instance = self.test_instance
         pidfile_path = self.scenario['path']
-        test_pid = self.mock_other_pid
+        test_pid = self.scenario['pidfile_pid']
         expect_signal = signal.SIG_DFL
         error = OSError(errno.ESRCH, "Not running")
         os.kill.mock_raises = error
@@ -520,7 +533,7 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
     def test_sends_terminate_signal_to_process_from_pidfile(self):
         """ Should send SIGTERM to the daemon process. """
         instance = self.test_instance
-        test_pid = self.mock_other_pid
+        test_pid = self.scenario['pidfile_pid']
         expect_signal = signal.SIGTERM
         expect_mock_output = """\
             ...
@@ -533,7 +546,7 @@ class DaemonRunner_do_action_stop_TestCase(scaffold.TestCase):
     def test_aborts_if_cannot_send_signal_to_process(self):
         """ Should raise SystemExit if cannot send signal to daemon process. """
         instance = self.test_instance
-        test_pid = self.mock_other_pid
+        test_pid = self.scenario['pidfile_pid']
         error = OSError(errno.EPERM, "Nice try")
         os.kill.mock_raises = error
         expect_error = SystemExit
@@ -551,6 +564,7 @@ class DaemonRunner_do_action_restart_TestCase(scaffold.TestCase):
         self.mock_tracker.clear()
 
         self.test_instance.action = 'restart'
+        self.scenario = self.pidlockfile_scenarios['nonexist']
 
     def tearDown(self):
         """ Tear down test fixtures. """
