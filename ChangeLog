@@ -1,3 +1,14 @@
+2014-12-19  Ben Finney  <ben+python@benfinney.id.au>
+
+    Version 1.5.7 released.
+
+    * Migrate to ‘mock’ library for mock objects in tests.
+      This will ease the port to Python 3, which has ‘mock’ in the
+      standard library.
+    * Migrate to ‘testscenarios’ library for unit test scenarios.
+    * Migrate to ‘unittest2’ library for back-ported improvements.
+    * Add a hacking guide for developers.
+
 2014-12-16  Ben Finney  <ben+python@benfinney.id.au>
 
     * Declare support explicitly for Python 2 only.
@@ -15,18 +26,6 @@
     Version 1.5.6 released.
 
     * Declare a maximum compatible version of ‘lockfile’ library.
-
-2014-12-08  Ben Finney  <ben+python@benfinney.id.au>
-
-    * Migrate to ‘mock’ library for mock objects in tests.
-      This will ease the port to Python 3, which has ‘mock’ in the
-      standard library.
-    * Migrate to ‘testscenarios’ library for unit test scenarios.
-    * Migrate to ‘unittest2’ library for back-ported improvements.
-
-2014-11-28  Ben Finney  <ben+python@benfinney.id.au>
-
-    * Add a hacking guide for developers.
 
 2014-11-27  Ben Finney  <ben+python@benfinney.id.au>
 
