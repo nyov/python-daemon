@@ -25,7 +25,6 @@
 
     * Wrap the ‘fromlist’ parameter of ‘__import__’ for Python 3
       compatibility.
-    * Migrate to JSON (instead of Python) for serialised version info.
 
 2014-12-12  Ben Finney  <ben+python@benfinney.id.au>
 
