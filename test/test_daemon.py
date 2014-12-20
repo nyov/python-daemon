@@ -39,8 +39,7 @@ from .test_pidlockfile import (
         setup_pidfile_fixtures,
         )
 
-from daemon import pidlockfile
-import daemon
+import daemon.daemon
 
 try:
     # Python 2 has both ‘str’ (bytes) and ‘unicode’.
@@ -87,7 +86,7 @@ def setup_daemon_context_fixtures(testcase):
             stdout=testcase.stream_files_by_name['stdout'],
             stderr=testcase.stream_files_by_name['stderr'],
             )
-    testcase.test_instance = daemon.DaemonContext(
+    testcase.test_instance = daemon.daemon.DaemonContext(
             **testcase.daemon_context_args)
 
 fake_default_signal_map = object()

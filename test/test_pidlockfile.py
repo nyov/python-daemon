@@ -37,7 +37,7 @@ import lockfile
 
 from . import scaffold
 
-from daemon import pidlockfile
+import daemon.pidlockfile
 
 
 class FakeFileDescriptorStringIO(StringIO, object):
@@ -64,15 +64,15 @@ class Exception_TestCase(scaffold.Exception_TestCase):
     """ Test cases for module exception classes. """
 
     scenarios = scaffold.make_exception_scenarios([
-            ('pidlockfile.PIDFileError', dict(
-                exc_type = pidlockfile.PIDFileError,
+            ('daemon.pidlockfile.PIDFileError', dict(
+                exc_type = daemon.pidlockfile.PIDFileError,
                 min_args = 1,
                 types = [Exception],
                 )),
-            ('pidlockfile.PIDFileParseError', dict(
-                exc_type = pidlockfile.PIDFileParseError,
+            ('daemon.pidlockfile.PIDFileParseError', dict(
+                exc_type = daemon.pidlockfile.PIDFileParseError,
                 min_args = 2,
-                types = [pidlockfile.PIDFileError, ValueError],
+                types = [daemon.pidlockfile.PIDFileError, ValueError],
                 )),
             ])
 
@@ -338,7 +338,7 @@ def setup_pidlockfile_fixtures(testcase, scenario_name=None):
             'write_pid_to_pidfile',
             'remove_existing_pidfile',
             ]:
-        func_patcher = mock.patch.object(pidlockfile, func_name)
+        func_patcher = mock.patch.object(daemon.pidlockfile, func_name)
         func_patcher.start()
         testcase.addCleanup(func_patcher.stop)
 
@@ -354,7 +354,7 @@ def set_pidlockfile_scenario(testcase, scenario_name):
     testcase.pidlockfile_args = dict(
             path=testcase.scenario['pidfile_path'],
             )
-    testcase.test_instance = pidlockfile.PIDLockFile(
+    testcase.test_instance = daemon.pidlockfile.PIDLockFile(
             **testcase.pidlockfile_args)
 
 
@@ -375,7 +375,7 @@ class PIDLockFile_TestCase(PIDLockFile_BaseTestCase):
     def test_instantiate(self):
         """ New instance of PIDLockFile should be created. """
         instance = self.test_instance
-        self.assertIsInstance(instance, pidlockfile.PIDLockFile)
+        self.assertIsInstance(instance, daemon.pidlockfile.PIDLockFile)
 
     def test_inherits_from_linkfilelock(self):
         """ Should inherit from LinkFileLock. """
@@ -435,7 +435,8 @@ class PIDLockFile_acquire_TestCase(PIDLockFile_BaseTestCase):
         instance = self.test_instance
         pidfile_path = self.scenario['pidfile_path']
         instance.acquire()
-        pidlockfile.write_pid_to_pidfile.assert_called_with(pidfile_path)
+        daemon.pidlockfile.write_pid_to_pidfile.assert_called_with(
+                pidfile_path)
 
     def test_raises_lock_failed_on_write_error(self):
         """ Should raise LockFailed error if write fails. """
@@ -443,8 +444,8 @@ class PIDLockFile_acquire_TestCase(PIDLockFile_BaseTestCase):
         instance = self.test_instance
         pidfile_path = self.scenario['pidfile_path']
         test_error = OSError(errno.EBUSY, "Bad stuff", pidfile_path)
-        pidlockfile.write_pid_to_pidfile.side_effect = test_error
-        expected_error = pidlockfile.LockFailed
+        daemon.pidlockfile.write_pid_to_pidfile.side_effect = test_error
+        expected_error = daemon.pidlockfile.LockFailed
         self.assertRaises(
                 expected_error,
                 instance.acquire)
@@ -461,7 +462,7 @@ class PIDLockFile_release_TestCase(PIDLockFile_BaseTestCase):
         self.assertRaises(
                 expected_error,
                 instance.release)
-        self.assertFalse(pidlockfile.remove_existing_pidfile.called)
+        self.assertFalse(daemon.pidlockfile.remove_existing_pidfile.called)
 
     def test_does_not_remove_existing_pidfile_if_not_my_lock(self):
         """ Should not request removal of PID file if we are not locking. """
@@ -471,7 +472,7 @@ class PIDLockFile_release_TestCase(PIDLockFile_BaseTestCase):
         self.assertRaises(
                 expected_error,
                 instance.release)
-        self.assertFalse(pidlockfile.remove_existing_pidfile.called)
+        self.assertFalse(daemon.pidlockfile.remove_existing_pidfile.called)
 
     def test_removes_existing_pidfile_if_i_am_locking(self):
         """ Should request removal of specified PID file if lock is ours. """
@@ -479,7 +480,8 @@ class PIDLockFile_release_TestCase(PIDLockFile_BaseTestCase):
         instance = self.test_instance
         pidfile_path = self.scenario['pidfile_path']
         instance.release()
-        pidlockfile.remove_existing_pidfile.assert_called_with(pidfile_path)
+        daemon.pidlockfile.remove_existing_pidfile.assert_called_with(
+                pidfile_path)
 
     def test_calls_linkfilelock_release(self):
         """ Should finally call LinkFileLock.release method. """
@@ -510,7 +512,8 @@ class PIDLockFile_break_lock_TestCase(PIDLockFile_BaseTestCase):
         instance = self.test_instance
         pidfile_path = self.scenario['pidfile_path']
         instance.break_lock()
-        pidlockfile.remove_existing_pidfile.assert_called_with(pidfile_path)
+        daemon.pidlockfile.remove_existing_pidfile.assert_called_with(
+                pidfile_path)
 
 
 class read_pid_from_pidfile_TestCase(scaffold.TestCase):
@@ -526,7 +529,7 @@ class read_pid_from_pidfile_TestCase(scaffold.TestCase):
         """ Should attempt to open specified pidfile filename. """
         set_pidlockfile_scenario(self, 'exist-other-pid')
         pidfile_path = self.scenario['pidfile_path']
-        dummy = pidlockfile.read_pid_from_pidfile(pidfile_path)
+        dummy = daemon.pidlockfile.read_pid_from_pidfile(pidfile_path)
         builtins.open.assert_called_with(pidfile_path, 'r')
 
     def test_reads_pid_from_file(self):
@@ -534,14 +537,14 @@ class read_pid_from_pidfile_TestCase(scaffold.TestCase):
         set_pidlockfile_scenario(self, 'exist-other-pid')
         pidfile_path = self.scenario['pidfile_path']
         expected_pid = self.scenario['pidfile_pid']
-        pid = pidlockfile.read_pid_from_pidfile(pidfile_path)
+        pid = daemon.pidlockfile.read_pid_from_pidfile(pidfile_path)
         self.assertEqual(expected_pid, pid)
 
     def test_returns_none_when_file_nonexist(self):
         """ Should return None when the PID file does not exist. """
         set_pidlockfile_scenario(self, 'not-exist')
         pidfile_path = self.scenario['pidfile_path']
-        pid = pidlockfile.read_pid_from_pidfile(pidfile_path)
+        pid = daemon.pidlockfile.read_pid_from_pidfile(pidfile_path)
         self.assertIs(None, pid)
 
     def test_raises_error_when_file_read_fails(self):
@@ -551,25 +554,25 @@ class read_pid_from_pidfile_TestCase(scaffold.TestCase):
         expected_error = EnvironmentError
         self.assertRaises(
                 expected_error,
-                pidlockfile.read_pid_from_pidfile, pidfile_path)
+                daemon.pidlockfile.read_pid_from_pidfile, pidfile_path)
 
     def test_raises_error_when_file_empty(self):
         """ Should raise error when the PID file is empty. """
         set_pidlockfile_scenario(self, 'exist-empty')
         pidfile_path = self.scenario['pidfile_path']
-        expected_error = pidlockfile.PIDFileParseError
+        expected_error = daemon.pidlockfile.PIDFileParseError
         self.assertRaises(
                 expected_error,
-                pidlockfile.read_pid_from_pidfile, pidfile_path)
+                daemon.pidlockfile.read_pid_from_pidfile, pidfile_path)
 
     def test_raises_error_when_file_contents_invalid(self):
         """ Should raise error when the PID file contents are invalid. """
         set_pidlockfile_scenario(self, 'exist-invalid')
         pidfile_path = self.scenario['pidfile_path']
-        expected_error = pidlockfile.PIDFileParseError
+        expected_error = daemon.pidlockfile.PIDFileParseError
         self.assertRaises(
                 expected_error,
-                pidlockfile.read_pid_from_pidfile, pidfile_path)
+                daemon.pidlockfile.read_pid_from_pidfile, pidfile_path)
 
 
 @mock.patch.object(os, "remove")
@@ -587,7 +590,7 @@ class remove_existing_pidfile_TestCase(scaffold.TestCase):
         """ Should attempt to remove specified PID file filename. """
         set_pidlockfile_scenario(self, 'exist-current-pid')
         pidfile_path = self.scenario['pidfile_path']
-        pidlockfile.remove_existing_pidfile(pidfile_path)
+        daemon.pidlockfile.remove_existing_pidfile(pidfile_path)
         mock_func_os_remove.assert_called_with(pidfile_path)
 
     def test_ignores_file_not_exist_error(
@@ -597,7 +600,7 @@ class remove_existing_pidfile_TestCase(scaffold.TestCase):
         pidfile_path = self.scenario['pidfile_path']
         test_error = OSError(errno.ENOENT, "Not there", pidfile_path)
         mock_func_os_remove.side_effect = test_error
-        pidlockfile.remove_existing_pidfile(pidfile_path)
+        daemon.pidlockfile.remove_existing_pidfile(pidfile_path)
         mock_func_os_remove.assert_called_with(pidfile_path)
 
     def test_propagates_arbitrary_oserror(
@@ -609,7 +612,7 @@ class remove_existing_pidfile_TestCase(scaffold.TestCase):
         mock_func_os_remove.side_effect = test_error
         self.assertRaises(
                 type(test_error),
-                pidlockfile.remove_existing_pidfile,
+                daemon.pidlockfile.remove_existing_pidfile,
                 pidfile_path)
 
 
@@ -628,7 +631,7 @@ class write_pid_to_pidfile_TestCase(scaffold.TestCase):
         pidfile_path = self.scenario['pidfile_path']
         expected_flags = (os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         expected_mode = 0644
-        pidlockfile.write_pid_to_pidfile(pidfile_path)
+        daemon.pidlockfile.write_pid_to_pidfile(pidfile_path)
         os.open.assert_called_with(pidfile_path, expected_flags, expected_mode)
 
     def test_writes_pid_to_file(self):
@@ -637,7 +640,7 @@ class write_pid_to_pidfile_TestCase(scaffold.TestCase):
         expected_content = "%(pid)d\n" % self.scenario
         with mock.patch.object(
                 self.scenario['pidfile'], "close") as mock_func_close:
-            pidlockfile.write_pid_to_pidfile(pidfile_path)
+            daemon.pidlockfile.write_pid_to_pidfile(pidfile_path)
         self.assertEqual(expected_content, self.scenario['pidfile'].getvalue())
 
     def test_closes_file_after_write(self):
@@ -654,7 +657,7 @@ class write_pid_to_pidfile_TestCase(scaffold.TestCase):
                     self.scenario['pidfile'], "close") as mock_func_close:
                 mock_pidfile.attach_mock(mock_func_write, "write")
                 mock_pidfile.attach_mock(mock_func_close, "close")
-                pidlockfile.write_pid_to_pidfile(pidfile_path)
+                daemon.pidlockfile.write_pid_to_pidfile(pidfile_path)
         mock_pidfile.assert_has_calls(expected_calls)
 
 
@@ -671,7 +674,7 @@ class TimeoutPIDLockFile_TestCase(scaffold.TestCase):
 
         for func_name in ['__init__', 'acquire']:
             func_patcher = mock.patch.object(
-                    pidlockfile.PIDLockFile, func_name)
+                    daemon.pidlockfile.PIDLockFile, func_name)
             func_patcher.start()
             self.addCleanup(func_patcher.stop)
 
@@ -684,13 +687,13 @@ class TimeoutPIDLockFile_TestCase(scaffold.TestCase):
                 path=self.scenario['pidfile_path'],
                 acquire_timeout=self.scenario['acquire_timeout'],
                 )
-        self.test_instance = pidlockfile.TimeoutPIDLockFile(
+        self.test_instance = daemon.pidlockfile.TimeoutPIDLockFile(
                 **self.test_kwargs)
 
     def test_inherits_from_pidlockfile(self):
         """ Should inherit from PIDLockFile. """
         instance = self.test_instance
-        self.assertIsInstance(instance, pidlockfile.PIDLockFile)
+        self.assertIsInstance(instance, daemon.pidlockfile.PIDLockFile)
 
     def test_init_has_expected_signature(self):
         """ Should have expected signature for ‘__init__’. """
@@ -698,7 +701,7 @@ class TimeoutPIDLockFile_TestCase(scaffold.TestCase):
         test_func.__name__ = str('__init__')
         self.assertFunctionSignatureMatch(
                 test_func,
-                pidlockfile.TimeoutPIDLockFile.__init__)
+                daemon.pidlockfile.TimeoutPIDLockFile.__init__)
 
     def test_has_specified_acquire_timeout(self):
         """ Should have specified ‘acquire_timeout’ value. """
@@ -707,16 +710,16 @@ class TimeoutPIDLockFile_TestCase(scaffold.TestCase):
         self.assertEqual(expected_timeout, instance.acquire_timeout)
 
     @mock.patch.object(
-            pidlockfile.PIDLockFile, "__init__",
+            daemon.pidlockfile.PIDLockFile, "__init__",
             autospec=True)
     def test_calls_superclass_init(self, mock_init):
         """ Should call the superclass ‘__init__’. """
         expected_path = self.test_kwargs['path']
-        instance = pidlockfile.TimeoutPIDLockFile(**self.test_kwargs)
+        instance = daemon.pidlockfile.TimeoutPIDLockFile(**self.test_kwargs)
         mock_init.assert_called_with(instance, expected_path)
 
     @mock.patch.object(
-            pidlockfile.PIDLockFile, "acquire",
+            daemon.pidlockfile.PIDLockFile, "acquire",
             autospec=True)
     def test_acquire_uses_specified_timeout(self, mock_func_acquire):
         """ Should call the superclass ‘acquire’ with specified timeout. """
@@ -727,7 +730,7 @@ class TimeoutPIDLockFile_TestCase(scaffold.TestCase):
         mock_func_acquire.assert_called_with(instance, expected_timeout)
 
     @mock.patch.object(
-            pidlockfile.PIDLockFile, "acquire",
+            daemon.pidlockfile.PIDLockFile, "acquire",
             autospec=True)
     def test_acquire_uses_stored_timeout_by_default(self, mock_func_acquire):
         """ Should call superclass ‘acquire’ with stored timeout by default. """
