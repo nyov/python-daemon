@@ -19,10 +19,10 @@ import os
 import errno
 
 from lockfile import (
-    LinkFileLock,
-    AlreadyLocked, LockFailed,
-    NotLocked, NotMyLock,
-    )
+        LinkFileLock,
+        AlreadyLocked, LockFailed,
+        NotLocked, NotMyLock,
+        )
 
 
 class PIDFileError(Exception):
