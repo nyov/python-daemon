@@ -66,7 +66,7 @@ def get_existing_version_info_content(infile_path):
     content = None
 
     try:
-        infile = open(infile_path, 'r')
+        infile = open(infile_path, 'rt')
         content = infile.read()
     except IOError:
         pass
@@ -82,7 +82,7 @@ def update_version_info_file_if_needed(outfile_path):
 
     if generated_content is not None:
         if generated_content != existing_content:
-            outfile = open(outfile_path, 'w+')
+            outfile = open(outfile_path, 'w+t')
             outfile.write(generated_content)
             outfile.close()
 
