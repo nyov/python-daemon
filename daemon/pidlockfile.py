@@ -46,12 +46,18 @@ class PIDLockFile(LinkFileLock, object):
 
     def read_pid(self):
         """ Get the PID from the lock file.
+
+            :return: The integer PID from the lock file if it can be read;
+                otherwise ``None``.
+
             """
         result = read_pid_from_pidfile(self.path)
         return result
 
     def acquire(self, *args, **kwargs):
         """ Acquire the lock.
+
+            :return: ``None``.
 
             Locks the PID file then creates the PID file for this
             lock. The `timeout` parameter is used as for the
@@ -68,6 +74,8 @@ class PIDLockFile(LinkFileLock, object):
     def release(self):
         """ Release the lock.
 
+            :return: ``None``.
+
             Removes the PID file then releases the lock, or raises an
             error if the current process does not hold the lock.
 
@@ -78,6 +86,8 @@ class PIDLockFile(LinkFileLock, object):
 
     def break_lock(self):
         """ Break an existing lock.
+
+            :return: ``None``.
 
             If the lock is held, breaks the lock and removes the PID
             file.
@@ -100,12 +110,30 @@ class TimeoutPIDLockFile(PIDLockFile):
         """
 
     def __init__(self, path, acquire_timeout=None, *args, **kwargs):
-        """ Set up the parameters of a TimeoutPIDLockFile. """
+        """ Set up the parameters of a TimeoutPIDLockFile.
+
+            :param path: Filesystem path to the PID file.
+            :param acquire_timeout: Value to use by default for the
+                `acquire` call.
+            :return: ``None``.
+
+            """
         self.acquire_timeout = acquire_timeout
         super(TimeoutPIDLockFile, self).__init__(path, *args, **kwargs)
 
     def acquire(self, timeout=None, *args, **kwargs):
-        """ Acquire the lock. """
+        """ Acquire the lock.
+
+            :param timeout: Specifies the timeout; see below for valid
+                values.
+            :return: ``None``.
+
+            The `timeout` defaults to the value set during
+            initialisation with the `acquire_timeout` parameter. It is
+            passed to `PIDLockFile.acquire`; see that method for
+            details.
+
+            """
         if timeout is None:
             timeout = self.acquire_timeout
         super(TimeoutPIDLockFile, self).acquire(timeout, *args, **kwargs)
@@ -114,9 +142,15 @@ class TimeoutPIDLockFile(PIDLockFile):
 def read_pid_from_pidfile(pidfile_path):
     """ Read the PID recorded in the named PID file.
 
-        Read and return the numeric PID recorded as text in the named
-        PID file. If the PID file does not exist, return ``None``. If
-        the content is not a valid PID, raise ``PIDFileParseError``.
+        :param pidfile_path: Filesystem path to the PID file.
+        :return: The numeric (integer) PID from the file, if it exists;
+            otherwise ``None``.
+        :raises PIDFileParseError: If the content of the PID file is not
+            parseable to a valid PID.
+
+        Read and return the numeric PID recorded as text in the named PID
+        file. If the PID file does not exist, return ``None``. If the
+        content is not a valid PID, raise ``PIDFileParseError``.
 
         """
     pid = None
@@ -154,8 +188,11 @@ def read_pid_from_pidfile(pidfile_path):
 def write_pid_to_pidfile(pidfile_path):
     """ Write the PID in the named PID file.
 
-        Get the numeric process ID (“PID”) of the current process
-        and write it to the named file as a line of text.
+        :param pidfile_path: Filesystem path to the PID file.
+        :return: ``None``.
+
+        Get the numeric process ID (“PID”) of the current process and write
+        it to the named file as a line of text.
 
         """
     open_flags = (os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -182,9 +219,12 @@ def write_pid_to_pidfile(pidfile_path):
 def remove_existing_pidfile(pidfile_path):
     """ Remove the named PID file if it exists.
 
-        Remove the named PID file. Ignore the condition if the file
-        does not exist, since that only means we are already in the
-        desired state.
+        :param pidfile_path: Filesystem path to the PID file.
+        :return: ``None``.
+
+        Remove the named PID file. Ignore the condition if the file does
+        not exist, since that only means we are already in the desired
+        state.
 
         """
     try:
