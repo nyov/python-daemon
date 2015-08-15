@@ -1,0 +1,53 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "origin"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/trunk/
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[remote "origin-python-daemon.devel"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/python-daemon.devel
+	fetch = +refs/heads/*:refs/remotes/origin-python-daemon.devel/*
+[remote "origin-python-3"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/python-3
+	fetch = +refs/heads/*:refs/remotes/origin-python-3/*
+[remote "origin-python-daemon.python-3.2"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/python-daemon.python-3.2
+	fetch = +refs/heads/*:refs/remotes/origin-python-daemon.python-3.2/*
+[remote "origin-python-daemon.subclass-linkfilelock"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/python-daemon.subclass-linkfilelock
+	fetch = +refs/heads/*:refs/remotes/origin-python-daemon.subclass-linkfilelock/*
+[remote "origin-subclass-linkfilelock"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/subclass-linkfilelock
+	fetch = +refs/heads/*:refs/remotes/origin-subclass-linkfilelock/*
+[remote "origin-version-1.5"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/version-1.5
+	fetch = +refs/heads/*:refs/remotes/origin-version-1.5/*
+[remote "origin-version-2.0"]
+	url = bzr::https://alioth.debian.org/anonscm/bzr/python-daemon/version-2.0
+	fetch = +refs/heads/*:refs/remotes/origin-version-2.0/*
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
+[branch "python3"]
+	remote = origin-python-3
+	merge = refs/heads/master
+[branch "python-daemon.devel"]
+	remote = origin-python-daemon.devel
+	merge = refs/heads/master
+[branch "python-daemon.python-3.2"]
+	remote = origin-python-daemon.python-3.2
+	merge = refs/heads/master
+[branch "python-daemon.subclass-linkfilelock"]
+	remote = origin-python-daemon.subclass-linkfilelock
+	merge = refs/heads/master
+[branch "subclass-linkfilelock"]
+	remote = origin-subclass-linkfilelock
+	merge = refs/heads/master
+[branch "version-1.5"]
+	remote = origin-version-1.5
+	merge = refs/heads/master
+[branch "version-2.0"]
+	remote = origin-version-2.0
+	merge = refs/heads/master

@@ -1,0 +1,9 @@
+This should contain everything to re-create this bzr2git mirror.
+
+Create a new git repo somewhere: `git init .`
+
+Copy `git/config` and `git/description` from this branch
+into `.git/config` and `.git/description` respectively.
+
+Run `git remote update` and `git pull` should get you running.
+Copy `git/refs/heads/` as well to get the branches "checked out" locally.
